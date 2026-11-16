@@ -1,0 +1,65 @@
+name: Build APK
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Arrange files
+        run: |
+          mkdir -p app/src/main/java/com/george/counter app/src/main/res/layout app/src/main/res/xml app/src/main/res/drawable
+          cp AndroidManifest.xml app/src/main/ || true
+          cp CounterWidget.java ConfigActivity.java MainActivity.java app/src/main/java/com/george/counter/ || true
+          cp widget.xml app/src/main/res/layout/ || true
+          cp widget_info.xml app/src/main/res/xml/ || true
+          cp bg.xml btn.xml app/src/main/res/drawable/ || true
+          cat > settings.gradle <<'EOF'
+          pluginManagement {
+              repositories { google(); mavenCentral(); gradlePluginPortal() }
+          }
+          dependencyResolutionManagement {
+              repositories { google(); mavenCentral() }
+          }
+          rootProject.name = "CounterWidget"
+          include ':app'
+          EOF
+          cat > build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application' version '8.5.2' apply false
+          }
+          EOF
+          printf 'org.gradle.jvmargs=-Xmx2g\nandroid.useAndroidX=true\n' > gradle.properties
+          cat > app/build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application'
+          }
+          android {
+              namespace 'com.george.counter'
+              compileSdk 34
+              defaultConfig {
+                  applicationId 'com.george.counter'
+                  minSdk 26
+                  targetSdk 34
+                  versionCode 1
+                  versionName '1.0'
+              }
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+          }
+          EOF
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.7
+      - run: gradle assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: goal-counter-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
